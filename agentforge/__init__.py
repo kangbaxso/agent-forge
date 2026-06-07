@@ -17,7 +17,7 @@ local llama.cpp / Ollama) — just point `base_url` at it.
 """
 from .agent import Agent
 from .tools import tool, Tool
-from .providers.openai_compatible import OpenAICompatible
+from .providers.openai_compatible import OpenAICompatible, ProviderError
 
-__version__ = "0.1.0"
-__all__ = ["Agent", "tool", "Tool", "OpenAICompatible"]
+__version__ = "0.2.0"
+__all__ = ["Agent", "tool", "Tool", "OpenAICompatible", "ProviderError"]

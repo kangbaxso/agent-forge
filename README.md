@@ -31,10 +31,20 @@ graph DSL. AgentForge is ~200 lines of readable code that does exactly that.
   inferred from annotations into JSON schema automatically.
 - **Transparent loop** — the whole reason-act cycle lives in one method you can
   read and patch.
+- **Resilient** — automatic retry with exponential backoff on 429 / 5xx /
+  network errors.
+- **Streaming + async** — stream the final answer token-by-token, or `await`
+  the agent from async code.
 - **Tested offline** — the test suite mocks the provider, so it runs with no
   API key and no network.
 
 ## Install
+
+```bash
+pip install agentforge-mini
+```
+
+Or from source:
 
 ```bash
 git clone https://github.com/kangbaxso/agent-forge
@@ -77,6 +87,33 @@ agent = Agent(
 ```python
 answer = agent.run("What's the weather in Tokyo?")
 ```
+
+### Stream the answer
+
+```python
+for token in agent.stream("Explain async IO in one paragraph."):
+    print(token, end="", flush=True)
+```
+
+Tool-calling rounds run first (non-streamed); once the model is ready to answer
+in plain text, that answer streams token-by-token.
+
+### Use it from async code
+
+```python
+answer = await agent.arun("What's 21 + 21?")
+```
+
+### Resilience
+
+The provider retries automatically on `429` and `5xx` responses and on network
+errors, with exponential backoff. Tune it:
+
+```python
+agent = Agent(model="gpt-4o-mini", max_retries=5)
+```
+
+After exhausting retries it raises `agentforge.ProviderError`.
 
 ## Point it at any provider
 

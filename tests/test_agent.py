@@ -78,6 +78,92 @@ def test_unknown_tool_is_handled():
     assert agent.run("call ghost") == "done"
 
 
+def test_async_run():
+    import asyncio
+
+    agent = Agent()
+    agent.provider = _MockProvider([{"role": "assistant", "content": "async hi"}])
+    out = asyncio.run(agent.arun("hi"))
+    assert out == "async hi"
+
+
+def test_stream_yields_tokens():
+    class _StreamProvider:
+        def chat(self, messages, tools=None, temperature=0.7):
+            return {"role": "assistant", "content": None,
+                    "tool_calls": None}  # no tool calls -> go straight to stream
+        def chat_stream(self, messages, temperature=0.7):
+            for piece in ["Hel", "lo ", "world"]:
+                yield piece
+
+    agent = Agent()
+    agent.provider = _StreamProvider()
+    out = "".join(agent.stream("say hello"))
+    assert out == "Hello world"
+
+
+def test_provider_retry_then_success(monkeypatch=None):
+    """Provider retries on 500 then succeeds on the 2nd attempt."""
+    import agentforge.providers.openai_compatible as oc
+
+    calls = {"n": 0}
+
+    class _Resp:
+        def __init__(self, status, payload=None):
+            self.status_code = status
+            self.text = "boom" if status >= 500 else ""
+            self._payload = payload or {}
+        def json(self):
+            return self._payload
+        def raise_for_status(self):
+            pass
+
+    def fake_post(url, headers=None, data=None, timeout=None, stream=False):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _Resp(500)
+        return _Resp(200, {"choices": [{"message": {"role": "assistant", "content": "ok"}}]})
+
+    orig_post = oc.requests.post
+    orig_sleep = oc.time.sleep
+    oc.requests.post = fake_post
+    oc.time.sleep = lambda *_: None  # no real delay in tests
+    try:
+        prov = oc.OpenAICompatible(model="x", api_key="k", max_retries=2, backoff=0.01)
+        msg = prov.chat([{"role": "user", "content": "hi"}])
+        assert msg["content"] == "ok"
+        assert calls["n"] == 2  # failed once, succeeded on retry
+    finally:
+        oc.requests.post = orig_post
+        oc.time.sleep = orig_sleep
+
+
+def test_provider_gives_up_after_retries():
+    import agentforge.providers.openai_compatible as oc
+
+    class _Resp:
+        status_code = 503
+        text = "down"
+        def raise_for_status(self): pass
+        def json(self): return {}
+
+    orig_post = oc.requests.post
+    orig_sleep = oc.time.sleep
+    oc.requests.post = lambda *a, **k: _Resp()
+    oc.time.sleep = lambda *_: None
+    try:
+        prov = oc.OpenAICompatible(model="x", api_key="k", max_retries=2, backoff=0.01)
+        raised = False
+        try:
+            prov.chat([{"role": "user", "content": "hi"}])
+        except oc.ProviderError:
+            raised = True
+        assert raised
+    finally:
+        oc.requests.post = orig_post
+        oc.time.sleep = orig_sleep
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     passed = 0
