@@ -1,5 +1,9 @@
 # AgentForge
 
+[![PyPI](https://img.shields.io/pypi/v/agentforge-mini.svg)](https://pypi.org/project/agentforge-mini/)
+[![Python](https://img.shields.io/pypi/pyversions/agentforge-mini.svg)](https://pypi.org/project/agentforge-mini/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A tiny, provider-agnostic framework for building tool-using AI agents in Python.
 
 No SDK lock-in, no heavy dependencies (just `requests`), no magic. One small
